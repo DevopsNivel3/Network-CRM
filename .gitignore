@@ -1,0 +1,31 @@
+# Nuxt dev/build outputs
+.output
+.data
+.nuxt
+.nitro
+.cache
+dist
+apps/mobile/dist-android
+
+# Node dependencies
+node_modules
+uploads/*
+
+# Logs
+logs
+*.log
+releases
+
+# Local runtime data and temporary diagnostics
+uploads
+.tmp-*
+
+# Misc
+.DS_Store
+.fleet
+.idea
+
+# Local env files
+.env
+.env.*
+!.env.example

@@ -1,0 +1,705 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Lead {
+  id                 Int                @id @default(autoincrement())
+  nome_lead          String?
+  cpf_cnpj           String?
+  responsavel        String?
+  contato_nome       String?
+  contato            String?
+  atividade          String?
+  faturamento        String?
+  num_funcionarios   Int?
+  observacoes        String?            @db.LongText
+  criado             DateTime           @default(now())
+  atualizado         DateTime           @updatedAt
+  usuario_id         Int
+  empresa_id         Int
+  origem_lead        String?
+  controle_lembretes Boolean            @default(true)
+  comentarios        LeadComentarios[]
+  empresa            Empresa            @relation(fields: [empresa_id], references: [id], onDelete: NoAction)
+  usuario            Usuario            @relation(fields: [usuario_id], references: [id], onDelete: NoAction)
+  localizacoes       Localizacao[]
+  grupos             LeadGrupoVinculo[]
+  oportunidades      Oportunidade[]
+  whatsappContacts   WhatsappContact[]
+  whatsappMessages   WhatsappMessage[]
+  lembretes          Lembrete[]
+  interacoes         LeadInteracao[]
+  contas_receber     ContaReceber[]
+
+  @@index([empresa_id, cpf_cnpj], map: "leads_empresa_cpf_cnpj_idx")
+  @@index([empresa_id, criado], map: "leads_empresa_criado_idx")
+  @@index([usuario_id, criado], map: "leads_usuario_criado_idx")
+  @@index([empresa_id], map: "leads_empresa_id_fkey")
+  @@index([usuario_id], map: "leads_usuario_id_fkey")
+  @@map("leads")
+}
+
+model Usuario {
+  id                               Int                           @id @default(autoincrement())
+  email                            String                        @unique
+  cpf                              String?                       @db.VarChar(11)
+  nome                             String
+  senha                            String
+  contato                          String
+  permissoes                       Int
+  avatar                           String?
+  preferencias                    Json?
+  desativado                       Boolean                       @default(false)
+  usuario_id                       Int?
+  criado                           DateTime                      @default(now())
+  atualizado                       DateTime                      @updatedAt
+  empresa_id                       Int?
+  logs                             AuditLog[]
+  leads_comentarios                LeadComentarios[]
+  leads_comentarios_anexos         LeadComentarioAnexo[]
+  leads                            Lead[]
+  oportunidades_comentarios        OportunidadeComentarios[]
+  oportunidades_comentarios_anexos OportunidadeComentarioAnexo[]
+  oportunidades_historico          OportunidadeHistorico[]
+  oportunidades_interacoes         OportunidadeInteracoes[]
+  oportunidades_interacoes_anexos  OportunidadeInteracaoAnexo[]
+  oportunidades_responsaveis       OportunidadeResponsaveis[]
+  oportunidades                    Oportunidade[]
+  boards_atribuicao                BoardOportunidade[]           @relation("BoardAssignedUser")
+  lead_grupos                      LeadGrupo[]
+  sessoes_presenca                 SessaoPresenca[]
+  senha_resets                     UsuarioSenhaReset[]
+  empresa                          Empresa?                      @relation(fields: [empresa_id], references: [id])
+  visitas                          Visita[]
+  whatsappMessages                 WhatsappMessage[]
+  lembretes                        Lembrete[]
+  lead_interacoes                  LeadInteracao[]
+  notificacoes                     NotificacaoUsuario[]
+  push_subscriptions               PushSubscription[]
+  contas_pagar_criadas             ContaPagar[]                  @relation("ContaPagarCriador")
+  contas_receber_criadas           ContaReceber[]                @relation("ContaReceberCriador")
+  mobile_sessions                  MobileSession[]
+
+  @@index([empresa_id], map: "usuarios_empresa_id_fkey")
+  @@map("usuarios")
+}
+
+model MobileSession {
+  id           String   @id @default(uuid()) @db.VarChar(36)
+  token_hash   String   @unique @db.Char(64)
+  usuario_id   Int
+  dispositivo String?  @db.VarChar(180)
+  plataforma  String?  @db.VarChar(30)
+  expira_em    DateTime
+  revogado_em  DateTime?
+  criado       DateTime @default(now())
+  atualizado   DateTime @updatedAt
+  usuario      Usuario  @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+
+  @@index([usuario_id, revogado_em, expira_em], map: "mobile_sessions_usuario_status_idx")
+  @@map("mobile_sessions")
+}
+
+model UsuarioSenhaReset {
+  id         Int      @id @default(autoincrement())
+  usuario_id Int
+  token      String   @unique
+  criado     DateTime @default(now())
+  atualizado DateTime @updatedAt
+  usado      Boolean  @default(false)
+  usuario    Usuario  @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+
+  @@index([usuario_id], map: "usuario_senha_reset_usuario_id_fkey")
+  @@map("usuario_senha_reset")
+}
+
+model Empresa {
+  id                 Int                  @id @default(autoincrement())
+  nome               String
+  grupo              String?              @db.VarChar(50)
+  contato            String
+  email              String
+  desativado         Boolean              @default(false)
+  usuario_id         Int?
+  modulos            Json?
+  criado             DateTime             @default(now())
+  atualizado         DateTime             @updatedAt
+  logs               AuditLog[]
+  boards             BoardOportunidade[]
+  leads              Lead[]
+  lead_grupos        LeadGrupo[]
+  usuarios           Usuario[]
+  integracoes        Integracao[]
+  sessoes_presenca   SessaoPresenca[]
+  whatsapp_contatos  WhatsappContact[]
+  whatsapp_mensagens WhatsappMessage[]
+  whatsapp_templates WhatsappTemplate[]
+  lembretes          Lembrete[]
+  lead_interacoes    LeadInteracao[]
+  notificacoes       NotificacaoUsuario[]
+  push_subscriptions PushSubscription[]
+  contas_pagar       ContaPagar[]
+  contas_receber     ContaReceber[]
+
+  @@map("empresas")
+}
+
+model ContaPagar {
+  id              Int       @id @default(autoincrement())
+  descricao       String    @db.VarChar(255)
+  fornecedor      String?   @db.VarChar(150)
+  responsavel     String?   @db.VarChar(150)
+  valor           Decimal   @db.Decimal(12, 2)
+  data_vencimento DateTime  @db.Date
+  data_pagamento  DateTime? @db.Date
+  status          String    @default("pendente") @db.VarChar(20)
+  forma_pagamento String?   @db.VarChar(30)
+  banco           String?   @db.VarChar(100)
+  recorrente      Boolean   @default(false)
+  categoria       String?   @db.VarChar(80)
+  observacoes     String?   @db.Text
+  empresa_id      Int
+  criado_por      Int
+  criado          DateTime  @default(now())
+  atualizado      DateTime  @updatedAt
+  empresa         Empresa   @relation(fields: [empresa_id], references: [id], onDelete: Cascade)
+  criador         Usuario   @relation("ContaPagarCriador", fields: [criado_por], references: [id], onDelete: Restrict)
+
+  @@index([empresa_id, status, data_vencimento], map: "contas_pagar_empresa_status_venc_idx")
+  @@index([criado_por], map: "contas_pagar_criado_por_idx")
+  @@map("contas_pagar")
+}
+
+model ContaReceber {
+  id                Int       @id @default(autoincrement())
+  descricao         String    @db.VarChar(255)
+  lead_id           Int
+  responsavel       String?   @db.VarChar(150)
+  valor             Decimal   @db.Decimal(12, 2)
+  data_vencimento   DateTime  @db.Date
+  data_recebimento  DateTime? @db.Date
+  status            String    @default("pendente") @db.VarChar(20)
+  forma_recebimento String?   @db.VarChar(30)
+  banco             String?   @db.VarChar(100)
+  recorrente        Boolean   @default(false)
+  categoria         String?   @db.VarChar(80)
+  observacoes       String?   @db.Text
+  empresa_id        Int
+  criado_por        Int
+  criado            DateTime  @default(now())
+  atualizado        DateTime  @updatedAt
+  empresa           Empresa   @relation(fields: [empresa_id], references: [id], onDelete: Cascade)
+  criador           Usuario   @relation("ContaReceberCriador", fields: [criado_por], references: [id], onDelete: Restrict)
+  lead              Lead      @relation(fields: [lead_id], references: [id], onDelete: Restrict)
+
+  @@index([empresa_id, status, data_vencimento], map: "contas_receber_empresa_status_venc_idx")
+  @@index([empresa_id, lead_id], map: "contas_receber_empresa_lead_idx")
+  @@index([criado_por], map: "contas_receber_criado_por_idx")
+  @@map("contas_receber")
+}
+
+model SessaoPresenca {
+  id               Int       @id @default(autoincrement())
+  usuario_id       Int
+  empresa_id       Int
+  codigo_sessao    String    @db.VarChar(100)
+  pagina_atual     String?   @db.VarChar(255)
+  ip               String?   @db.VarChar(64)
+  user_agent       String?   @db.Text
+  iniciado         DateTime  @default(now())
+  ultimo_heartbeat DateTime  @default(now())
+  encerrado        DateTime?
+  criado           DateTime  @default(now())
+  atualizado       DateTime  @updatedAt
+  usuario          Usuario   @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+  empresa          Empresa   @relation(fields: [empresa_id], references: [id], onDelete: Cascade)
+
+  @@index([usuario_id], map: "sessoes_presenca_usuario_id_fkey")
+  @@index([empresa_id], map: "sessoes_presenca_empresa_id_fkey")
+  @@index([ultimo_heartbeat], map: "sessoes_presenca_ultimo_heartbeat_idx")
+  @@index([encerrado], map: "sessoes_presenca_encerrado_idx")
+  @@index([usuario_id, codigo_sessao], map: "sessoes_presenca_usuario_codigo_idx")
+  @@map("sessoes_presenca")
+}
+
+model Integracao {
+  id         Int      @id @default(autoincrement())
+  empresa_id Int
+  tipo       String
+  enabled    Boolean  @default(true)
+  config     Json?
+  criado     DateTime @default(now())
+  atualizado DateTime @updatedAt
+  empresa    Empresa  @relation(fields: [empresa_id], references: [id], onDelete: Cascade)
+
+  @@unique([empresa_id, tipo], map: "integracoes_empresa_tipo_uq")
+  @@index([tipo], map: "integracoes_tipo_idx")
+  @@map("integracoes")
+}
+
+model WhatsappContact {
+  id           Int       @id @default(autoincrement())
+  empresa_id   Int
+  lead_id      Int?
+  numero       String
+  nome         String?
+  foto_url     String?   @db.Text
+  is_whatsapp  Boolean   @default(false)
+  ultimo_check DateTime?
+  criado       DateTime  @default(now())
+  atualizado   DateTime  @updatedAt
+  empresa      Empresa   @relation(fields: [empresa_id], references: [id], onDelete: Cascade)
+  lead         Lead?     @relation(fields: [lead_id], references: [id], onDelete: SetNull)
+
+  @@index([empresa_id, numero], map: "whatsapp_contatos_empresa_numero_idx")
+  @@map("whatsapp_contatos")
+}
+
+model WhatsappMessage {
+  id            Int       @id @default(autoincrement())
+  empresa_id    Int
+  lead_id       Int?
+  usuario_id    Int?
+  numero        String
+  direction     String
+  body          String?   @db.LongText
+  media_type    String?
+  media_mime    String?
+  media_base64  String?   @db.LongText
+  media_name    String?
+  media_caption String?
+  message_id    String?
+  timestamp     DateTime?
+  raw           Json?
+  criado        DateTime  @default(now())
+  empresa       Empresa   @relation(fields: [empresa_id], references: [id], onDelete: Cascade)
+  lead          Lead?     @relation(fields: [lead_id], references: [id], onDelete: SetNull)
+  usuario       Usuario?  @relation(fields: [usuario_id], references: [id], onDelete: SetNull)
+
+  @@index([empresa_id, lead_id], map: "whatsapp_mensagens_empresa_lead_idx")
+  @@index([empresa_id, numero], map: "whatsapp_mensagens_empresa_numero_idx")
+  @@map("whatsapp_mensagens")
+}
+
+model WhatsappTemplate {
+  id         Int      @id @default(autoincrement())
+  empresa_id Int
+  titulo     String
+  corpo      String   @db.Text
+  criado     DateTime @default(now())
+  atualizado DateTime @updatedAt
+  empresa    Empresa  @relation(fields: [empresa_id], references: [id], onDelete: Cascade)
+
+  @@map("whatsapp_templates")
+}
+
+model BoardOportunidade {
+  id                   Int            @id @default(autoincrement())
+  titulo               String
+  descricao            String?
+  cor                  String?        @default("#3B82F6")
+  qualificacao         String         @default("Frio") @db.VarChar(20)
+  controle_lembretes   Boolean        @default(true)
+  exige_motivo         Boolean        @default(false)
+  grupo_motivos        String?
+  motivos              Json?
+  exigir_obs_outro     Boolean        @default(false)
+  posicao              Float          @default(0)
+  criado               DateTime       @default(now())
+  atualizado           DateTime       @updatedAt
+  empresa_id           Int?
+  usuario_atribuido_id Int?
+  empresa              Empresa?       @relation(fields: [empresa_id], references: [id], onDelete: Cascade)
+  usuario_atribuido    Usuario?       @relation("BoardAssignedUser", fields: [usuario_atribuido_id], references: [id], onDelete: SetNull)
+  oportunidades        Oportunidade[]
+
+  @@index([empresa_id], map: "board_oportunidades_empresa_id_fkey")
+  @@index([usuario_atribuido_id], map: "board_oportunidades_usuario_atribuido_id_fkey")
+  @@map("board_oportunidades")
+}
+
+model Oportunidade {
+  id                 Int                        @id @default(autoincrement())
+  tipo               String?
+  descricao          String?                    @db.Text
+  status             String?                    @default("Frio") @db.VarChar(50)
+  valor_estimado     Decimal?                   @db.Decimal(10, 2)
+  faixa_valor        String?
+  num_pdvs           Int?
+  num_lojas          Int?
+  observacoes        String?                    @db.LongText
+  criado             DateTime                   @default(now())
+  atualizado         DateTime                   @updatedAt
+  lead_id            Int
+  usuario_id         Int
+  infraestrutura     String?
+  desativado         Boolean                    @default(false)
+  controle_lembretes Boolean                    @default(true)
+  posicao            Float                      @default(0)
+  statusInt          Int?                       @default(1)
+  board_id           Int?
+  comentarios        OportunidadeComentarios[]
+  historico          OportunidadeHistorico[]
+  interacoes         OportunidadeInteracoes[]
+  responsaveis       OportunidadeResponsaveis[]
+  lembretes          Lembrete[]
+  board              BoardOportunidade?         @relation(fields: [board_id], references: [id])
+  lead               Lead                       @relation(fields: [lead_id], references: [id], onDelete: Cascade)
+  usuario            Usuario                    @relation(fields: [usuario_id], references: [id], onDelete: NoAction)
+  visitas            Visita[]
+
+  @@index([lead_id], map: "oportunidades_lead_id_fkey")
+  @@index([usuario_id], map: "oportunidades_usuario_id_fkey")
+  @@index([board_id], map: "oportunidades_board_id_fkey")
+  @@index([usuario_id, criado], map: "oportunidades_usuario_criado_idx")
+  @@index([board_id, criado], map: "oportunidades_board_criado_idx")
+  @@index([criado], map: "oportunidades_criado_idx")
+  @@map("oportunidades")
+}
+
+model OportunidadeResponsaveis {
+  id                    Int          @id @default(autoincrement())
+  oportunidade_id       Int
+  usuario_id            Int
+  principal             Boolean      @default(false)
+  gerencia_responsaveis Boolean      @default(false)
+  pode_editar           Boolean      @default(false)
+  pode_interacoes       Boolean      @default(false)
+  pode_visitas          Boolean      @default(false)
+  criado                DateTime     @default(now())
+  atualizado            DateTime     @updatedAt
+  oportunidade          Oportunidade @relation(fields: [oportunidade_id], references: [id], onDelete: Cascade)
+  usuario               Usuario      @relation(fields: [usuario_id], references: [id])
+
+  @@index([oportunidade_id], map: "oportunidade_responsaveis_oportunidade_id_fkey")
+  @@index([usuario_id], map: "oportunidade_responsaveis_usuario_id_fkey")
+  @@map("oportunidade_responsaveis")
+}
+
+model OportunidadeHistorico {
+  id                Int          @id @default(autoincrement())
+  oportunidade_id   Int
+  usuario_id        Int
+  posicao           Float        @default(0)
+  acao              String
+  descricao         String?
+  motivo            String?
+  motivo_observacao String?      @db.Text
+  criado            DateTime     @default(now())
+  board_id          Int?
+  oportunidade      Oportunidade @relation(fields: [oportunidade_id], references: [id], onDelete: Cascade)
+  usuario           Usuario      @relation(fields: [usuario_id], references: [id], onDelete: NoAction)
+
+  @@index([oportunidade_id], map: "oportunidade_historico_oportunidade_id_fkey")
+  @@index([usuario_id], map: "oportunidade_historico_usuario_id_fkey")
+  @@index([criado, board_id], map: "oportunidade_historico_criado_board_idx")
+  @@map("oportunidade_historico")
+}
+
+model OportunidadeInteracoes {
+  id              Int                          @id @default(autoincrement())
+  oportunidade_id Int
+  statusInt       Int
+  tipo            Int
+  conteudo        String?                      @db.LongText
+  data            DateTime                     @default(now())
+  usuario_id      Int
+  status          Int
+  oportunidade    Oportunidade                 @relation(fields: [oportunidade_id], references: [id], onDelete: NoAction)
+  usuario         Usuario                      @relation(fields: [usuario_id], references: [id], onDelete: NoAction)
+  anexos          OportunidadeInteracaoAnexo[]
+
+  @@index([oportunidade_id], map: "oportunidade_interacoes_oportunidade_id_fkey")
+  @@index([usuario_id], map: "oportunidade_interacoes_usuario_id_fkey")
+  @@index([data, oportunidade_id], map: "oportunidade_interacoes_data_oportunidade_idx")
+  @@index([usuario_id, data], map: "oportunidade_interacoes_usuario_data_idx")
+  @@map("oportunidade_interacoes")
+}
+
+model OportunidadeComentarios {
+  id              Int                           @id @default(autoincrement())
+  descricao       String                        @db.LongText
+  oportunidade_id Int?
+  usuario_id      Int?
+  atualizado      DateTime                      @updatedAt
+  criado          DateTime                      @default(now())
+  oportunidade    Oportunidade?                 @relation(fields: [oportunidade_id], references: [id], onDelete: Cascade)
+  usuario         Usuario?                      @relation(fields: [usuario_id], references: [id])
+  anexos          OportunidadeComentarioAnexo[]
+
+  @@index([oportunidade_id], map: "oportunidade_comentarios_oportunidade_id_fkey")
+  @@index([usuario_id], map: "oportunidade_comentarios_usuario_id_fkey")
+  @@map("oportunidade_comentarios")
+}
+
+model LeadComentarios {
+  id         Int                   @id @default(autoincrement())
+  descricao  String                @db.LongText
+  lead_id    Int?
+  usuario_id Int?
+  criado     DateTime              @default(now())
+  atualizado DateTime              @updatedAt
+  lead       Lead?                 @relation(fields: [lead_id], references: [id], onDelete: Cascade)
+  usuario    Usuario?              @relation(fields: [usuario_id], references: [id])
+  anexos     LeadComentarioAnexo[]
+
+  @@index([lead_id], map: "lead_comentarios_lead_id_fkey")
+  @@index([usuario_id], map: "lead_comentarios_usuario_id_fkey")
+  @@map("lead_comentarios")
+}
+
+model LeadComentarioAnexo {
+  id            Int             @id @default(autoincrement())
+  comentario_id Int
+  usuario_id    Int
+  nome          String          @db.Text
+  url           String          @db.Text
+  tipo          String?
+  tamanho       Int?
+  criado        DateTime        @default(now())
+  comentario    LeadComentarios @relation(fields: [comentario_id], references: [id], onDelete: Cascade)
+  usuario       Usuario         @relation(fields: [usuario_id], references: [id], onDelete: NoAction)
+
+  @@index([comentario_id], map: "lead_comentarios_anexos_comentario_id_fkey")
+  @@index([usuario_id], map: "lead_comentarios_anexos_usuario_id_fkey")
+  @@map("lead_comentarios_anexos")
+}
+
+model OportunidadeComentarioAnexo {
+  id            Int                     @id @default(autoincrement())
+  comentario_id Int
+  usuario_id    Int
+  nome          String                  @db.Text
+  url           String                  @db.Text
+  tipo          String?
+  tamanho       Int?
+  criado        DateTime                @default(now())
+  comentario    OportunidadeComentarios @relation(fields: [comentario_id], references: [id], onDelete: Cascade)
+  usuario       Usuario                 @relation(fields: [usuario_id], references: [id], onDelete: NoAction)
+
+  @@index([comentario_id], map: "oportunidade_comentarios_anexos_comentario_id_fkey")
+  @@index([usuario_id], map: "oportunidade_comentarios_anexos_usuario_id_fkey")
+  @@map("oportunidade_comentarios_anexos")
+}
+
+model OportunidadeInteracaoAnexo {
+  id           Int                    @id @default(autoincrement())
+  interacao_id Int
+  usuario_id   Int
+  nome         String                 @db.Text
+  url          String                 @db.Text
+  tipo         String?
+  tamanho      Int?
+  criado       DateTime               @default(now())
+  interacao    OportunidadeInteracoes @relation(fields: [interacao_id], references: [id], onDelete: Cascade)
+  usuario      Usuario                @relation(fields: [usuario_id], references: [id], onDelete: NoAction)
+
+  @@index([interacao_id], map: "oportunidade_interacoes_anexos_interacao_id_fkey")
+  @@index([usuario_id], map: "oportunidade_interacoes_anexos_usuario_id_fkey")
+  @@map("oportunidade_interacoes_anexos")
+}
+
+model Visita {
+  id              Int          @id @default(autoincrement())
+  data_inicio     DateTime
+  data_fim        DateTime?
+  imagem_src      String?      @db.VarChar(255)
+  latitude        Decimal?     @db.Decimal(9, 6)
+  longitude       Decimal?     @db.Decimal(9, 6)
+  status          String       @default("Pendente") @db.VarChar(50)
+  criado          DateTime     @default(now())
+  atualizado      DateTime     @updatedAt
+  localizacao_id  Int
+  oportunidade_id Int
+  usuario_id      Int
+  hora_inicio     String
+  motivo          String?      @db.LongText
+  statusInt       Int?         @default(1)
+  localizacao     Localizacao  @relation(fields: [localizacao_id], references: [id], onDelete: Cascade)
+  oportunidade    Oportunidade @relation(fields: [oportunidade_id], references: [id], onDelete: NoAction)
+  usuario         Usuario      @relation(fields: [usuario_id], references: [id], onDelete: NoAction)
+
+  @@index([localizacao_id], map: "visitas_localizacao_id_fkey")
+  @@index([oportunidade_id], map: "visitas_oportunidade_id_fkey")
+  @@index([usuario_id], map: "visitas_usuario_id_fkey")
+  @@map("visitas")
+}
+
+model Estado {
+  id      Int      @id @default(autoincrement())
+  nome    String
+  uf      String
+  ibge    Int
+  cidades Cidade[]
+
+  @@map("estados")
+}
+
+model Cidade {
+  id        Int    @id @default(autoincrement())
+  nome      String
+  estado_id Int
+  estado    Estado @relation(fields: [estado_id], references: [id], onDelete: NoAction)
+
+  @@index([estado_id], map: "cidades_estado_id_fkey")
+  @@map("cidades")
+}
+
+model Localizacao {
+  id          Int      @id @default(autoincrement())
+  rua         String?
+  numero      String?
+  cidade      String?
+  complemento String?
+  estado      String?
+  cep         String?
+  criado      DateTime @default(now())
+  atualizado  DateTime @updatedAt
+  lead_id     Int
+  lead        Lead     @relation(fields: [lead_id], references: [id], onDelete: Cascade)
+  Visita      Visita[]
+
+  @@index([lead_id], map: "localizacoes_lead_id_fkey")
+  @@map("localizacoes")
+}
+
+model LeadGrupo {
+  id         Int                @id @default(autoincrement())
+  nome       String
+  descricao  String?            @db.Text
+  criado     DateTime           @default(now())
+  atualizado DateTime           @updatedAt
+  empresa_id Int
+  usuario_id Int?
+  empresa    Empresa            @relation(fields: [empresa_id], references: [id], onDelete: Cascade)
+  usuario    Usuario?           @relation(fields: [usuario_id], references: [id], onDelete: SetNull)
+  leads      LeadGrupoVinculo[]
+
+  @@index([empresa_id], map: "lead_grupos_empresa_id_fkey")
+  @@index([usuario_id], map: "lead_grupos_usuario_id_fkey")
+  @@map("lead_grupos")
+}
+
+model LeadGrupoVinculo {
+  id         Int       @id @default(autoincrement())
+  lead_id    Int
+  grupo_id   Int
+  criado     DateTime  @default(now())
+  atualizado DateTime  @updatedAt
+  lead       Lead      @relation(fields: [lead_id], references: [id], onDelete: Cascade)
+  grupo      LeadGrupo @relation(fields: [grupo_id], references: [id], onDelete: Cascade)
+
+  @@unique([lead_id, grupo_id], map: "lead_grupo_unique")
+  @@index([lead_id], map: "lead_grupo_vinculos_lead_id_fkey")
+  @@index([grupo_id], map: "lead_grupo_vinculos_grupo_id_fkey")
+  @@map("lead_grupo_vinculos")
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  user_id    Int?
+  empresa_id Int?
+  operacao   String
+  descricao  String?  @db.LongText
+  ip         String
+  agent      String
+  criado     DateTime @default(now())
+  empresa    Empresa? @relation(fields: [empresa_id], references: [id])
+  usuario    Usuario? @relation(fields: [user_id], references: [id])
+
+  @@index([empresa_id], map: "audit_logs_empresa_id_fkey")
+  @@index([user_id], map: "audit_logs_user_id_fkey")
+  @@map("audit_logs")
+}
+
+model NotificacaoUsuario {
+  id          Int       @id @default(autoincrement())
+  empresa_id  Int?
+  usuario_id  Int
+  tipo        String    @db.VarChar(60)
+  titulo      String    @db.VarChar(180)
+  mensagem    String    @db.Text
+  link        String?   @db.VarChar(255)
+  payload     Json?
+  lida        Boolean   @default(false)
+  lida_em     DateTime?
+  entregue_em DateTime?
+  criado      DateTime  @default(now())
+  atualizado  DateTime  @updatedAt
+  empresa     Empresa?  @relation(fields: [empresa_id], references: [id], onDelete: Cascade)
+  usuario     Usuario   @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+
+  @@index([empresa_id], map: "notificacoes_usuario_empresa_id_fkey")
+  @@index([usuario_id, lida, criado], map: "notificacoes_usuario_usuario_lida_criado_idx")
+  @@index([usuario_id, entregue_em, criado], map: "notificacoes_usuario_usuario_entregue_criado_idx")
+  @@map("notificacoes_usuario")
+}
+
+model PushSubscription {
+  id         Int       @id @default(autoincrement())
+  empresa_id Int?
+  usuario_id Int
+  endpoint   String    @unique @db.VarChar(500)
+  p256dh     String    @db.VarChar(255)
+  auth       String    @db.VarChar(255)
+  expiration DateTime?
+  user_agent String?   @db.Text
+  criado     DateTime  @default(now())
+  atualizado DateTime  @updatedAt
+  empresa    Empresa?  @relation(fields: [empresa_id], references: [id], onDelete: Cascade)
+  usuario    Usuario   @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+
+  @@index([empresa_id], map: "push_subscriptions_empresa_id_fkey")
+  @@index([usuario_id], map: "push_subscriptions_usuario_id_fkey")
+  @@map("push_subscriptions")
+}
+
+model Lembrete {
+  id              Int           @id @default(autoincrement())
+  empresa_id      Int
+  lead_id         Int?
+  oportunidade_id Int?
+  usuario_id      Int
+  tipo            String // "Follow-up", "Cotação", etc
+  descricao       String?       @db.Text
+  data_vencimento DateTime
+  prioridade      String // "Alta", "Media", "Baixa"
+  status          String        @default("Pendente") // "Pendente", "Concluido", "Cancelado"
+  criado          DateTime      @default(now())
+  atualizado      DateTime      @updatedAt
+  empresa         Empresa       @relation(fields: [empresa_id], references: [id], onDelete: Cascade)
+  lead            Lead?         @relation(fields: [lead_id], references: [id], onDelete: Cascade)
+  oportunidade    Oportunidade? @relation(fields: [oportunidade_id], references: [id], onDelete: Cascade)
+  usuario         Usuario       @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+
+  @@index([empresa_id], map: "lembretes_empresa_id_fkey")
+  @@index([lead_id], map: "lembretes_lead_id_fkey")
+  @@index([oportunidade_id], map: "lembretes_oportunidade_id_fkey")
+  @@index([usuario_id], map: "lembretes_usuario_id_fkey")
+  @@map("lembretes")
+}
+
+model LeadInteracao {
+  id             Int      @id @default(autoincrement())
+  empresa_id     Int
+  lead_id        Int
+  usuario_id     Int
+  tipo           String // "Ligação", "WhatsApp", "E-mail", "Reunião"
+  descricao      String?  @db.Text
+  data_interacao DateTime @default(now())
+  criado         DateTime @default(now())
+  atualizado     DateTime @updatedAt
+  empresa        Empresa  @relation(fields: [empresa_id], references: [id], onDelete: Cascade)
+  lead           Lead     @relation(fields: [lead_id], references: [id], onDelete: Cascade)
+  usuario        Usuario  @relation(fields: [usuario_id], references: [id], onDelete: Cascade)
+
+  @@index([empresa_id], map: "lead_interacoes_empresa_id_fkey")
+  @@index([lead_id], map: "lead_interacoes_lead_id_fkey")
+  @@index([usuario_id], map: "lead_interacoes_usuario_id_fkey")
+  @@map("lead_interacoes")
+}

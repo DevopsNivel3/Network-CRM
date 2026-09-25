@@ -1,0 +1,2 @@
+ALTER TABLE `empresas`
+  ADD COLUMN `grupo` VARCHAR(50) NULL;
